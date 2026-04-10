@@ -9,6 +9,7 @@ from fastapi import APIRouter, Query, HTTPException, Request
 
 from scrapers.inserate_ultra_optimized import ultra_optimized_scrape_inserate
 from scrapers.inserat import get_inserate_details_optimized
+from utils.listing_filters import normalize_listing_ids
 
 router = APIRouter()
 
@@ -24,6 +25,10 @@ async def get_inserate_with_details(
     page_count: int = Query(1, ge=1, le=3, description="Number of pages to fetch"),
     max_concurrent_details: int = Query(
         5, ge=1, le=10, description="Maximum concurrent detail fetches"
+    ),
+    exclude_adids: list[str] | None = Query(
+        None,
+        description="Listing IDs to exclude from the result. Supports repeated values or comma-separated IDs.",
     ),
 ):
     """
@@ -55,6 +60,18 @@ async def get_inserate_with_details(
             raise HTTPException(status_code=500, detail="Failed to fetch listings")
 
         listings = listings_result.get("results", [])
+        excluded_adids = normalize_listing_ids(exclude_adids)
+        excluded_count = 0
+
+        if excluded_adids:
+            original_count = len(listings)
+            listings = [
+                listing
+                for listing in listings
+                if listing.get("adid") not in excluded_adids
+            ]
+            excluded_count = original_count - len(listings)
+
         if not listings:
             return {
                 "success": True,
@@ -66,6 +83,7 @@ async def get_inserate_with_details(
                     "details_fetched": 0,
                     "success_rate": 100,
                 },
+                "excluded_known_adids": excluded_count,
             }
 
         # Phase 2: Fetch details concurrently with controlled concurrency
@@ -137,6 +155,9 @@ async def get_inserate_with_details(
                 ),
             },
         }
+
+        if excluded_count > 0:
+            response["excluded_known_adids"] = excluded_count
 
         return response
 

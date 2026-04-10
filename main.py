@@ -5,11 +5,13 @@ from routers import (
     inserat,
     inserate_detailed_ultra as inserate_detailed,
 )
+from utils.auth import BasicAuthSettings, create_basic_auth_middleware
 from utils.browser import OptimizedPlaywrightManager
 from utils.asyncio_optimizations import EventLoopOptimizer
 
 # Global browser manager instance for sharing across all endpoints
 browser_manager = None
+basic_auth_settings = BasicAuthSettings.from_env()
 
 
 @asynccontextmanager
@@ -39,6 +41,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(version="1.0.0", lifespan=lifespan)
+app.middleware("http")(create_basic_auth_middleware(basic_auth_settings))
+app.state.basic_auth_enabled = basic_auth_settings.enabled
 
 
 @app.get("/")
@@ -47,6 +51,7 @@ async def root():
         "message": "Welcome to the Kleinanzeigen API",
         "endpoints": ["/inserate", "/inserat/{id}", "/inserate-detailed"],
         "status": "operational",
+        "basic_auth_enabled": app.state.basic_auth_enabled,
     }
 
 

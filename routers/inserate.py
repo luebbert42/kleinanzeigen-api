@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Query, HTTPException, Request
 from scrapers.inserate import get_inserate_klaz_optimized
 from utils.error_handling import ErrorLogger, error_handling_context, ErrorSeverity
+from utils.listing_filters import normalize_listing_ids
 
 router = APIRouter()
 
@@ -14,6 +15,10 @@ async def get_inserate(
     min_price: int = Query(None),
     max_price: int = Query(None),
     page_count: int = Query(1, ge=1, le=20),
+    exclude_adids: list[str] | None = Query(
+        None,
+        description="Listing IDs to exclude from the result. Supports repeated values or comma-separated IDs.",
+    ),
 ):
     """
     Enhanced inserate endpoint with comprehensive error handling and warnings.
@@ -78,11 +83,19 @@ async def get_inserate(
             seen_adids = set()
             unique_results = []
             duplicate_count = 0
+            excluded_adids = normalize_listing_ids(exclude_adids)
+            excluded_count = 0
 
             for result in response["results"]:
-                if result["adid"] not in seen_adids:
+                adid = result["adid"]
+
+                if adid in excluded_adids:
+                    excluded_count += 1
+                    continue
+
+                if adid not in seen_adids:
                     unique_results.append(result)
-                    seen_adids.add(result["adid"])
+                    seen_adids.add(adid)
                 else:
                     duplicate_count += 1
 
@@ -134,6 +147,8 @@ async def get_inserate(
             if duplicate_count > 0:
                 enhanced_response["duplicates_removed"] = duplicate_count
                 enhanced_response["original_result_count"] = len(response["results"])
+            if excluded_count > 0:
+                enhanced_response["excluded_known_adids"] = excluded_count
 
             # Log successful operation summary
             logger.log_operation_summary(

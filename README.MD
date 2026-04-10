@@ -78,6 +78,18 @@ uv sync
 uv run uvicorn main:app --reload
 ```
 
+#### Optional Basic Auth
+
+If you want to protect the API for tools like n8n, set both environment variables before starting the server:
+
+```sh
+export BASIC_AUTH_USERNAME="n8n"
+export BASIC_AUTH_PASSWORD="change-me"
+uv run uvicorn main:app --reload
+```
+
+If neither variable is set, authentication stays disabled. If only one is set, the API aborts on startup to avoid a half-configured setup.
+
 ### Installation using Docker
 
 1. Build the Docker image
@@ -93,6 +105,25 @@ docker run -p 8000:8000 ebay-kleinanzeigen-api
 ```
 
 The API will be available at `http://localhost:8000`
+
+### Docker Compose for n8n Network
+
+There is also a ready-to-use Compose template in [docker-compose.yml](docker-compose.yml).
+
+Typical usage:
+
+```sh
+cp .env.example .env
+docker compose up -d --build
+```
+
+It expects that your n8n Docker network already exists and joins the API service to that external network. Adjust `N8N_DOCKER_NETWORK` in `.env` if your network has a different name.
+
+Inside the shared Docker network, n8n can then reach the API via:
+
+```text
+http://kleinanzeigen-api:8000
+```
 
 ### API Endpoints
 
@@ -110,11 +141,16 @@ The API will be available at `http://localhost:8000`
 - **`min_price`** *(integer, optional)*: The minimum price in Euros for the listings (e.g., `200` for at least 200 Euros).
 - **`max_price`** *(integer, optional)*: The maximum price in Euros for the listings (e.g., `500` for at most 500 Euros).
 - **`page_count`** *(integer, optional)*: The number of pages to search or return (e.g., `5` for the first 5 pages, default is 1, max: 20 pages).
+- **`exclude_adids`** *(string[], optional)*: Listing IDs that should be filtered out before the response is returned. Works with repeated parameters or comma-separated IDs.
 
 ##### Example Request
 
 ```http
 GET /inserate?query=fahrrad&location=10178&radius=5&min_price=200&page_count=5
+```
+
+```http
+GET /inserate?query=halbmarathon&location=10178&page_count=3&exclude_adids=1234567890,2345678901
 ```
 
 #### 2. Fetch Listing Details
@@ -144,6 +180,7 @@ GET /inserat/12345
 Same as `/inserate` endpoint, plus:
 
 - **`max_concurrent_details`** *(integer, optional)*: Maximum concurrent detail fetches (default: 5, max: 10).
+- **`exclude_adids`** *(string[], optional)*: Listing IDs to skip before detail pages are fetched.
 
 ##### Example Request
 
@@ -242,6 +279,13 @@ Performance tests conducted on **Arch Linux** with **Intel i7-1260P** processor:
 - **Docker Optimized**: Fast container builds with uv package manager
 
 API documentation is available at `http://localhost:8000/docs` when running locally.
+
+### n8n Integration Notes
+
+- Use the n8n `HTTP Request` node with authentication type `Basic Auth` if you enable the environment variables above.
+- Persist already-notified `adid` values in n8n and send them back via `exclude_adids` on the next request.
+- This keeps deduplication state outside the scraper process and avoids losing state after an API restart.
+- A concrete n8n setup with `Data Table`, code snippets, and node order is documented in [docs/n8n-workflow.md](docs/n8n-workflow.md).
 
 ## License
 
