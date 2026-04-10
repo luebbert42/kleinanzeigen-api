@@ -80,12 +80,21 @@ uv run uvicorn main:app --reload
 
 #### Optional Basic Auth
 
-If you want to protect the API for tools like n8n, set both environment variables before starting the server:
+If you want to protect the API for tools like n8n, set both environment variables before starting the server.
+
+The app also loads a local `.env` file automatically on startup, so the credentials can come either from shell environment variables or from `.env`. Existing process environment variables keep precedence over values from `.env`.
 
 ```sh
 export BASIC_AUTH_USERNAME="n8n"
 export BASIC_AUTH_PASSWORD="change-me"
 uv run uvicorn main:app --reload
+```
+
+Example `.env`:
+
+```dotenv
+BASIC_AUTH_USERNAME=n8n
+BASIC_AUTH_PASSWORD=change-me
 ```
 
 If neither variable is set, authentication stays disabled. If only one is set, the API aborts on startup to avoid a half-configured setup.
@@ -124,6 +133,29 @@ Inside the shared Docker network, n8n can then reach the API via:
 ```text
 http://kleinanzeigen-api:8000
 ```
+
+If you add this service from a parent `docker-compose.yml`, the build context must point to the `kleinanzeigen` project directory, not the parent folder. Example:
+
+```yaml
+services:
+  kleinanzeigen-api:
+    build:
+      context: ./kleinanzeigen
+      dockerfile: Dockerfile
+    container_name: kleinanzeigen-api
+    env_file:
+      - ./n8n_api_helper/.env
+    ports:
+      - "7999:8000"
+    networks:
+      - n8n
+```
+
+Why this matters:
+
+- `COPY requirements.txt .` in the Dockerfile resolves relative to the Docker build context.
+- If `context: .` points to the parent folder, Docker looks for `./requirements.txt` there instead of `./kleinanzeigen/requirements.txt`.
+- The previous `playwright install-deps` step can also fail on newer Ubuntu package repositories; the current Dockerfile now uses the official Playwright Python base image, which already includes the matching browser runtime dependencies.
 
 ### API Endpoints
 

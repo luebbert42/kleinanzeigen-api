@@ -1,10 +1,11 @@
 import base64
+from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from utils.auth import BasicAuthSettings, create_basic_auth_middleware
+from utils.auth import BasicAuthSettings, create_basic_auth_middleware, load_env
 
 
 def test_basic_auth_settings_require_both_values(monkeypatch):
@@ -57,3 +58,23 @@ def test_basic_auth_allows_correct_credentials():
 
     assert response.status_code == 200
     assert response.json() == {"ok": True}
+
+
+def test_load_env_reads_dotenv_file_without_overriding_existing_env(
+    monkeypatch, tmp_path: Path
+):
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "BASIC_AUTH_USERNAME=from-dotenv\nBASIC_AUTH_PASSWORD=from-dotenv\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("BASIC_AUTH_USERNAME", raising=False)
+    monkeypatch.setenv("BASIC_AUTH_PASSWORD", "from-env")
+
+    load_env()
+    settings = BasicAuthSettings.from_env()
+
+    assert settings.username == "from-dotenv"
+    assert settings.password == "from-env"

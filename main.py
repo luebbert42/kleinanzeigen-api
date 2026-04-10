@@ -5,12 +5,13 @@ from routers import (
     inserat,
     inserate_detailed_ultra as inserate_detailed,
 )
-from utils.auth import BasicAuthSettings, create_basic_auth_middleware
+from utils.auth import BasicAuthSettings, create_basic_auth_middleware, load_env
 from utils.browser import OptimizedPlaywrightManager
 from utils.asyncio_optimizations import EventLoopOptimizer
 
 # Global browser manager instance for sharing across all endpoints
 browser_manager = None
+load_env()
 basic_auth_settings = BasicAuthSettings.from_env()
 
 

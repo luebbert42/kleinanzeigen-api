@@ -5,8 +5,13 @@ import secrets
 from dataclasses import dataclass
 from typing import Awaitable, Callable
 
+from dotenv import load_dotenv
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
+
+
+def load_env() -> None:
+    load_dotenv(override=False)
 
 
 @dataclass(frozen=True)
